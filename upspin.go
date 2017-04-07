@@ -4,20 +4,35 @@ import (
 	"fmt"
 	"os"
 
+	"upspin.io/upspin"
+
 	billy "gopkg.in/src-d/go-billy.v2"
 )
 
 const separator = '/'
 
-type Upspin struct{}
+type Upspin struct {
+	client   upspin.Client
+	userName upspin.UserName
+}
 
-func New() *Upspin {
-	return &Upspin{}
+func New(c upspin.Client, u upspin.UserName) *Upspin {
+	return &Upspin{
+		client:   c,
+		userName: u,
+	}
 }
 
 // Implements billy.Filesystem.
-func (fs *Upspin) Create(filename string) (billy.File, error) {
-	return nil, fmt.Errorf("TODO")
+func (fs *Upspin) Create(path string) (billy.File, error) {
+	upath := fs.pathName(path)
+	uf, err := fs.client.Create(upath)
+	f := newFile(uf)
+	return f, err
+}
+
+func (fs *Upspin) pathName(path string) upspin.PathName {
+	return upspin.PathName(string(fs.userName) + path)
 }
 
 // Implements billy.Filesystem.
