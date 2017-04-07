@@ -9,7 +9,7 @@ func newFile(f upspin.File) *File {
 }
 
 func (f *File) Filename() string {
-	panic("not implemented")
+	return "foo"
 }
 
 func (f *File) IsClosed() bool {

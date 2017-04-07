@@ -25,10 +25,7 @@ func New(c upspin.Client, u upspin.UserName) *Upspin {
 
 // Implements billy.Filesystem.
 func (fs *Upspin) Create(path string) (billy.File, error) {
-	upath := fs.pathName(path)
-	uf, err := fs.client.Create(upath)
-	f := newFile(uf)
-	return f, err
+	return &File{}, nil
 }
 
 func (fs *Upspin) pathName(path string) upspin.PathName {

@@ -5,7 +5,9 @@ import (
 	"time"
 
 	. "gopkg.in/check.v1"
+	"gopkg.in/src-d/go-billy.v2/test"
 	"upspin.io/bind"
+	"upspin.io/client"
 	"upspin.io/config"
 	dirserver "upspin.io/dir/inprocess"
 	"upspin.io/factotum"
@@ -18,7 +20,7 @@ import (
 func Test(t *testing.T) { TestingT(t) }
 
 type UpspinSuite struct {
-	//test.FilesystemSuite
+	test.FilesystemSuite
 	cfg upspin.Config
 }
 
@@ -45,6 +47,8 @@ func (s *UpspinSuite) SetUpSuite(c *C) {
 	setUpServers(c, s.cfg)
 	s.assertUser(c)
 	s.assertEmptyHome(c)
+
+	s.FilesystemSuite.Fs = New(client.New(s.cfg), userName)
 }
 
 // Initialize the client config in its receiver to the fixture values.
@@ -155,7 +159,4 @@ func (s *UpspinSuite) SetUpTest(c *C) {
 }
 
 func (s *UpspinSuite) TearDownTest(c *C) {
-}
-
-func (s *UpspinSuite) Test(c *C) {
 }
