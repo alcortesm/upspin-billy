@@ -19,15 +19,18 @@ const (
 )
 
 type Upspin struct {
-	client   upspin.Client
-	userName upspin.UserName
-	append   bool
+	client      upspin.Client
+	userName    upspin.UserName
+	append      bool
+	followLinks bool
 }
 
 func New(c upspin.Client, userName upspin.UserName) *Upspin {
 	return &Upspin{
-		client:   c,
-		userName: userName,
+		client:      c,
+		userName:    userName,
+		append:      false,
+		followLinks: true,
 	}
 }
 
@@ -100,24 +103,59 @@ func (fs *Upspin) Open(path string) (billy.File, error) {
 }
 
 // Implements billy.Filesystem.
+// O_SYNC is ignored.
 func (fs *Upspin) OpenFile(filename string, flags int, _ os.FileMode) (billy.File, error) {
 	if err := checkFlags(flags); err != nil {
 		return nil, err
 	}
 
-	fn := fs.Open
-	if flags&os.O_CREATE != 0 {
-		fn = fs.Create
+	var ctor func(string) (billy.File, error)
+	if isSet(flags, os.O_CREATE) {
+		ctor = fs.Create
+		if isSet(flags, os.O_EXCL) {
+			found, err := fs.exists(fs.pathName(filename))
+			if err != nil {
+				return nil, err
+			}
+			if found {
+				return nil, fmt.Errorf("file already exists: %s", filename)
+			}
+
+			// From open(2): When these two flags are specified [O_CREATE and
+			// O_EXCL], symbolic links are not followed: if pathname is
+			// a symbolic link, then open() fails regardless of where the
+			// symbolic link points to.
+			fs.followLinks = false
+		}
+	} else {
+		ctor = fs.Open
+		if canWrite(flags) && isSet(flags, os.O_TRUNC) {
+			// delete the file contents
+			fs.client.Put(fs.pathName(filename), []byte{})
+		}
 	}
 
-	f, err := fn(filename)
+	f, err := ctor(filename)
 	if err != nil {
 		return nil, err
 	}
 
-	fs.append = flags&os.O_APPEND != 0
+	fs.append = isSet(flags, os.O_APPEND)
 
 	return f, nil
+}
+
+func isSet(flags int, bit int) bool {
+	return flags&bit != 0
+}
+
+func canWrite(flags int) bool {
+	return isSet(flags, os.O_WRONLY) || isSet(flags, os.O_RDWR)
+}
+
+func (fs *Upspin) exists(filename upspin.PathName) (bool, error) {
+	_, found, err := fs.lookup(filename)
+	return found, err
 }
 
 const (
