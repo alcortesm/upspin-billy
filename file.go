@@ -2,32 +2,42 @@ package upspinfs
 
 import "upspin.io/upspin"
 
-type File struct{}
+type File struct {
+	upspin.File
+	userName upspin.UserName
+	isClosed bool
+}
 
-func newFile(f upspin.File) *File {
-	return &File{}
+func newFile(file upspin.File, userName upspin.UserName) *File {
+	return &File{
+		File:     file,
+		userName: userName,
+		isClosed: false,
+	}
 }
 
 func (f *File) Filename() string {
-	return "foo"
+	// strip the userName and the separator from the pathName of the upspin file.
+	return string(f.File.Name())[len(userName)+len(sep):]
 }
 
 func (f *File) IsClosed() bool {
-	panic("not implemented")
+	return f.isClosed
 }
 
 func (f *File) Write(p []byte) (n int, err error) {
-	panic("not implemented")
+	return f.File.Write(p)
 }
 
 func (f *File) Read(p []byte) (n int, err error) {
-	panic("not implemented")
+	return f.File.Read(p)
 }
 
 func (f *File) Seek(offset int64, whence int) (int64, error) {
-	panic("not implemented")
+	panic("File.Seek not implemented")
 }
 
-func (f *File) Close() error {
-	panic("not implemented")
+func (f *File) Close() (err error) {
+	f.isClosed = true
+	return f.File.Close()
 }

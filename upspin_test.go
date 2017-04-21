@@ -10,6 +10,7 @@ import (
 	"upspin.io/client"
 	"upspin.io/config"
 	dirserver "upspin.io/dir/inprocess"
+	"upspin.io/errors"
 	"upspin.io/factotum"
 	keyserver "upspin.io/key/inprocess"
 	storeserver "upspin.io/store/inprocess"
@@ -48,7 +49,7 @@ func (s *UpspinSuite) SetUpSuite(c *C) {
 	s.assertUser(c)
 	s.assertEmptyHome(c)
 
-	s.FilesystemSuite.Fs = New(client.New(s.cfg), userName)
+	s.FilesystemSuite.FS = New(client.New(s.cfg), userName)
 }
 
 // Initialize the client config in its receiver to the fixture values.
@@ -68,9 +69,12 @@ func (s *UpspinSuite) setUpClientConfig(c *C) {
 // Runs and registers key, dir, and store servers for a the user
 // described in cfg.  Its home is initialized empty.
 func setUpServers(c *C, cfg upspin.Config) {
-	bind.RegisterKeyServer(upspin.InProcess, keyserver.New())
-	bind.RegisterStoreServer(upspin.InProcess, storeserver.New())
-	bind.RegisterDirServer(upspin.InProcess, dirserver.New(cfg))
+	err := bind.RegisterKeyServer(upspin.InProcess, keyserver.New())
+	c.Assert(err, IsNil)
+	err = bind.RegisterStoreServer(upspin.InProcess, storeserver.New())
+	c.Assert(err, IsNil)
+	err = bind.RegisterDirServer(upspin.InProcess, dirserver.New(cfg))
+	c.Assert(err, IsNil)
 
 	user := &upspin.User{
 		Name:      cfg.UserName(),
@@ -159,4 +163,36 @@ func (s *UpspinSuite) SetUpTest(c *C) {
 }
 
 func (s *UpspinSuite) TearDownTest(c *C) {
+	dirServer, err := bind.DirServerFor(s.cfg, "")
+	c.Assert(err, IsNil)
+	deleteAll(dirServer, upspin.PathName(s.cfg.UserName()+"/"))
+}
+
+var (
+	errNotExist = errors.E(errors.NotExist)
+)
+
+// deleteAll recursively deletes the directory named by path through the
+// provided DirServer, first deleting path/Access and then path/*.
+func deleteAll(dir upspin.DirServer, path upspin.PathName) error {
+	if _, err := dir.Delete(path + "/Access"); err != nil {
+		if !errors.Match(errNotExist, err) {
+			return err
+		}
+	}
+	entries, err := dir.Glob(string(path + "/*"))
+	if err != nil && err != upspin.ErrFollowLink {
+		return err
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			if err := deleteAll(dir, e.Name); err != nil {
+				return err
+			}
+		}
+		if _, err := dir.Delete(e.Name); err != nil {
+			return err
+		}
+	}
+	return nil
 }
